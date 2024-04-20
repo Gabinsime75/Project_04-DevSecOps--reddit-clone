@@ -1,5 +1,5 @@
 # Reddit Clone App on Kubernetes
-Test 200
+![alt text](https://github.com/Gabinsime75/Project_04-DevSecOps--reddit-clone/blob/main/Project-Architecture-Flow.png)
 
 
 
