@@ -1,1 +1,98 @@
+pipeline {
+    agent any
+    tools {
+        jdk 'jdk17'
+        nodejs 'node19'
+    }
 
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+        APP_NAME = "reddit-clone-pipeline"
+        RELEASE = "1.0.0"
+        DOCKER_USER = "gabin75"
+        DOCKER_PASS = 'docker'
+        IMAGE_NAME = "${DOCKER_USER}" + "/" + "${APP_NAME}"
+    }
+
+    stages {
+        stage ('Clean workspace') {
+            steps {
+                cleanws()
+            }
+        }
+
+        stage ('Code checkout from git') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Gabinsime75/Project_4-reddit-clone.git'
+            }
+        }
+
+        stage ('Sonarqube analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube-Server') {
+                    sh '''$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Reddit-Clone-CI \
+                    -Dsonar.projectKey=Reddit-Clone-CI'''
+                }
+            }
+        }
+
+        stage ('Quality ate') {
+            steps {
+                script {
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
+                }
+            }
+        }
+
+        stage ('Insatall Dependencies') {
+            steps {
+                sh "npm install"
+            }
+        }
+
+        stage ('OWASP FS SCAN') {
+            steps {
+                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+            }
+        }
+
+        stage ('TRIVY FS SCAN') {
+            steps {
+                sh "trivy fs . > trivyfs.txt"
+            }
+        }
+
+        stage ('Build & Push Docker Image') {
+            steps {
+                script {
+                     docker.withRegistry('',DOCKER_PASS) {
+                         docker_image = docker.build "${IMAGE_NAME}"
+                     }
+                     docker.withRegistry('',DOCKER_PASS) {
+                         docker_image.push("${IMAGE_TAG}")
+                         docker_image.push('latest')
+                     }
+                 }
+            }
+        }
+
+        stage ('Trivy Image Scan') {
+            steps {
+                script {
+	              sh ('docker run -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image ashfaque9x/reddit-clone-pipeline:latest --no-progress --scanners vuln  --exit-code 0 --severity HIGH,CRITICAL --format table > trivyimage.txt')
+                 }
+            }
+        }
+
+        stage ('Cleanup Artifacts') {
+            steps {
+                script {
+                      sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG}"
+                      sh "docker rmi ${IMAGE_NAME}:latest"
+                 }
+            }
+        }
+
+    }
+}
