@@ -21,7 +21,7 @@ pipeline {
             }
         }
 
-        stage ('Code checkout from git') {
+        stage ('Code checkout from Git') {
             steps {
                 git branch: 'main', url: 'https://github.com/Gabinsime75/Project_4-reddit-clone.git'
             }
@@ -36,10 +36,10 @@ pipeline {
             }
         }
 
-        stage ('Quality ate') {
+        stage ('Quality Gate') {
             steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
+                    waitForQualityGate abortPipeline: false, credentialsId: 'SonarQube-token'
                 }
             }
         }
